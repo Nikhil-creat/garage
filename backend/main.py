@@ -1,0 +1,141 @@
+"""Garage API: security middleware, hybrid-lite RAG (TF-IDF), tool-using agent, CNN-style vision scan."""
+import io, json, math, os, re, threading, time, urllib.request
+from collections import Counter, defaultdict, deque
+from pathlib import Path
+import numpy as np
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+
+app = FastAPI(title="Garage API", docs_url=None, redoc_url=None, openapi_url=None)
+SEC = {
+    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'",
+    "X-Content-Type-Options": "nosniff", "X-Frame-Options": "SAMEORIGIN",
+    "Referrer-Policy": "strict-origin-when-cross-origin", "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+}
+HITS: dict = defaultdict(deque)
+LIMIT, WINDOW, MAX_BODY = 60, 60, 2 * 1024 * 1024
+
+@app.middleware("http")
+async def guard(req: Request, call_next):
+    if req.url.path.startswith("/api"):
+        ip = (req.headers.get("x-forwarded-for", "") or (req.client.host if req.client else "?")).split(",")[0].strip()
+        q, now = HITS[ip], time.time()
+        while q and now - q[0] > WINDOW: q.popleft()
+        if len(q) >= LIMIT: return JSONResponse({"detail": "rate limit"}, 429, headers=SEC)
+        q.append(now)
+        if int(req.headers.get("content-length") or 0) > MAX_BODY + 4096: return JSONResponse({"detail": "too large"}, 413, headers=SEC)
+    res = await call_next(req)
+    for k, v in SEC.items(): res.headers[k] = v
+    return res
+
+KB = [
+    ("controls", "Steer with the on-screen wheel, A and D keys or tilt. W or gas accelerates, S or brake slows. Shift or the nitro button boosts. Press C for cockpit camera."),
+    ("combo", "A near miss happens when you pass a car within about 3.4 metres without touching it. Chained near misses within 4 seconds multiply the bonus: 50 points times the combo."),
+    ("nitro", "Nitro lifts the speed cap from 46 to 62 metres per second and adds acceleration. It drains at 34 per second and recharges at 3 per second, so save it for clear straights."),
+    ("fuel", "Fuel drains faster with speed and gas. Green fuel cans restore 30. Fuel Saver mode drains 2.2 times faster and spawns cans less often. Coast to save fuel."),
+    ("crash", "A collision adds damage based on closing speed, cuts your speed to 35 percent and resets the combo. At 100 damage the car is wrecked. Brake early and avoid the oncoming left lanes."),
+    ("lanes", "The road has four lanes. The two left lanes carry oncoming traffic and score double points but are dangerous. The two right lanes move in your direction at lower speeds."),
+    ("night", "Night Rush adds headlights, 1.5 times the traffic and 1.2 times coin value. Watch taillight glows to judge distance."),
+    ("scoring", "Score comes from distance, doubled in the oncoming lanes, plus 25 per coin and near-miss bonuses. Your best score is saved on this device."),
+]
+STOP = set("a an and are as at be by do does for from how i in is it of on or the to what when with you your my me can tips".split())
+TOK = lambda t: [w for w in re.findall(r"[a-z0-9]+", t.lower()) if w not in STOP]
+DOCS = [(n, Counter(TOK(n + " " + n + " " + t))) for n, t in KB]
+DF = Counter(w for _, c in DOCS for w in c)
+IDF = {w: math.log((1 + len(DOCS)) / (1 + d)) + 1 for w, d in DF.items()}
+
+def rag_search(q: str, k: int = 2):
+    qv = Counter(TOK(q)); out = []
+    for i, (name, c) in enumerate(DOCS):
+        dot = sum(qv[w] * c[w] * IDF.get(w, 0) ** 2 for w in qv if w in c)
+        nrm = math.sqrt(sum((v * IDF[w]) ** 2 for w, v in c.items())) * math.sqrt(sum((v * IDF.get(w, 0)) ** 2 for w, v in qv.items())) or 1
+        out.append((dot / nrm, name, KB[i][1]))
+    return [o for o in sorted(out, reverse=True)[:k] if o[0] > 0.05]
+
+def analyse_run(t: dict):
+    tips = []
+    if t["damage"] >= 60: tips.append("Heavy damage: brake earlier and keep to the right lanes.")
+    if t["fuel"] < 25: tips.append("Fuel was low: ease off the gas and collect green cans.")
+    if t["coins"] < 5: tips.append("Few coins: line up with coin rows in your lane.")
+    if t["mode"] == "night": tips.append("Night Rush: use taillight glow to judge gaps.")
+    return tips or ["Clean run. Chain near misses for bigger combos."]
+
+def llm(question, context):
+    key = os.environ.get("GROQ_API_KEY")
+    if not key: return None
+    body = json.dumps({"model": os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile"), "max_tokens": 220, "messages": [
+        {"role": "system", "content": "You are Garage's driving coach. Answer in under 80 words using only the context."},
+        {"role": "user", "content": f"Context: {context}\nQuestion: {question}"}]}).encode()
+    req = urllib.request.Request("https://api.groq.com/openai/v1/chat/completions", body, {"Authorization": "Bearer " + key, "Content-Type": "application/json", "User-Agent": "garage/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=8) as r: return json.loads(r.read())["choices"][0]["message"]["content"].strip()
+    except Exception: return None
+
+class Score(BaseModel):
+    name: str = Field(pattern=r"^[A-Za-z0-9 _.\-]{1,16}$"); score: int = Field(ge=0, le=10**7)
+    dist: int = Field(ge=0, le=10**7); coins: int = Field(ge=0, le=10**4)
+
+DB, LOCK = Path("/tmp/garage_scores.json"), threading.Lock()
+def _load():
+    try: return json.loads(DB.read_text())
+    except Exception: return []
+
+@app.get("/api/scores")
+def top(): return sorted(_load(), key=lambda r: -r["score"])[:10]
+
+@app.post("/api/scores")
+def add(s: Score):
+    if s.score > s.dist * 0.16 + s.coins * 25 + 60000: raise HTTPException(422, "implausible score")
+    with LOCK:
+        rows = sorted(_load() + [s.model_dump()], key=lambda r: -r["score"])[:200]
+        DB.write_text(json.dumps(rows))
+    return {"ok": True}
+
+class Telemetry(BaseModel):
+    score: int = Field(ge=0, le=10**9); dist: int = Field(ge=0, le=10**8); coins: int = Field(ge=0, le=10**5)
+    damage: int = Field(ge=0, le=200); fuel: int = Field(ge=-5, le=100); mode: str = Field(pattern="^(highway|night|fuel)$")
+
+class Msg(BaseModel):
+    message: str = Field(min_length=1, max_length=500)
+    telemetry: Telemetry | None = None
+
+@app.get("/api/health")
+def health(): return {"ok": True}
+
+@app.post("/api/agent")
+def agent(m: Msg):
+    trace = [f"plan: intent={'coach' if m.telemetry else 'question'}"]; parts = []
+    if m.telemetry:
+        trace.append("tool: analyse_run(telemetry)"); parts += analyse_run(m.telemetry.model_dump())
+    trace.append("tool: rag_search(message)"); hits = rag_search(m.message)
+    if hits:
+        parts += [h[2] for h in hits[: 1 if m.telemetry else 2]]; trace.append("sources: " + ", ".join(h[1] for h in hits))
+    elif not parts: parts.append("I couldn't find that in the Garage knowledge base. Try asking about controls, combos, nitro, fuel, crashes or lanes.")
+    txt = " ".join(parts); out = llm(m.message, txt)
+    if out: txt = out; trace.append("llm: groq")
+    trace.append("compose: answer")
+    return {"answer": txt, "trace": trace}
+
+@app.post("/api/cnn")
+async def cnn(file: UploadFile = File(...)):
+    if file.content_type not in ("image/jpeg", "image/png", "image/webp"): raise HTTPException(415, "jpeg/png/webp only")
+    raw = await file.read(MAX_BODY + 1)
+    if len(raw) > MAX_BODY: raise HTTPException(413, "max 2 MB")
+    try:
+        from PIL import Image
+        im = Image.open(io.BytesIO(raw)); im.verify(); im = Image.open(io.BytesIO(raw)).convert("L").resize((64, 64))
+    except Exception: raise HTTPException(400, "invalid image")
+    x = np.asarray(im, dtype=np.float32) / 255
+    kx = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], np.float32); ky = kx.T
+    def conv(a, k): return sum(k[i, j] * a[i:i + a.shape[0] - 2, j:j + a.shape[1] - 2] for i in range(3) for j in range(3))
+    f = np.maximum(np.hypot(conv(x, kx), conv(x, ky)), 0)
+    p = f[: f.shape[0] // 2 * 2, : f.shape[1] // 2 * 2].reshape(31, 2, 31, 2).max((1, 3))
+    edge, bright = float(p.mean()), float(x.mean())
+    label = "low visibility" if bright < .25 else "busy scene" if edge > .45 else "clear road"
+    return {"label": label, "edge_density": round(edge, 3), "brightness": round(bright, 3), "note": "heuristic Sobel+ReLU+maxpool, not a trained model"}
+
+WEB = Path(__file__).resolve().parent.parent / "web"
+if WEB.exists(): app.mount("/", StaticFiles(directory=WEB, html=True), name="web")
