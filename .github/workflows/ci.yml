@@ -1,0 +1,25 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r backend/requirements.txt httpx
+      - name: Frontend syntax
+        run: |
+          node -e "for (const f of ['web/index.html','web/play.html']) { const h = require('fs').readFileSync(f,'utf8'); for (const m of h.matchAll(/<script>([\s\S]*?)<\/script>/g)) new Function(m[1]); } console.log('frontend ok')"
+      - name: Backend smoke test
+        run: |
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+          from backend.main import app
+          c = TestClient(app)
+          assert c.get('/api/health').json()['ok']
+          assert 'nitro' in c.post('/api/agent', json={'message': 'how does nitro work'}).json()['answer'].lower()
+          assert c.post('/api/scores', json={'name': 'x', 'score': 10**6, 'dist': 1, 'coins': 0}).status_code == 422
+          print('backend ok')
+          PY
+      - run: docker build -t garage .

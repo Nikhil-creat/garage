@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 app = FastAPI(title="Garage API", docs_url=None, redoc_url=None, openapi_url=None)
 SEC = {
-    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://ipwho.is https://api.open-meteo.com https://vpic.nhtsa.dot.gov; frame-ancestors 'self'; base-uri 'self'; form-action 'self'",
     "X-Content-Type-Options": "nosniff", "X-Frame-Options": "SAMEORIGIN",
     "Referrer-Policy": "strict-origin-when-cross-origin", "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
