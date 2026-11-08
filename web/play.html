@@ -46,7 +46,7 @@ body.inmenu .hud,body.inmenu #vig{visibility:hidden}
 <div class="row" id="modes"><button data-m="highway" class="sel">HIGHWAY</button><button data-m="night">NIGHT RUSH</button><button data-m="fuel">FUEL SAVER</button></div>
 <div class="row"><button id="qb">GRAPHICS: HIGH</button><button id="tb">TILT: OFF</button></div>
 <div class="row"><select id="mk" aria-label="Car make"><option>Toyota</option><option>Honda</option><option>Ford</option><option>BMW</option><option>Tesla</option><option>Hyundai</option></select><input type="color" id="cl" value="#00e5ff" aria-label="Car colour"><input id="nm" maxlength="16" placeholder="Leaderboard name" aria-label="Name"></div><div class="row"><button id="lb">LIVE WEATHER: OFF</button></div><p class="s" id="lv"></p><div class="row"><button id="gb">🔧 GARAGE · <span id="wl">0</span>🪙</button><button id="mt">SOUND: ON</button></div><div id="gp" class="row hide"></div><button class="big" id="go">START ENGINE</button><p class="s">Best: <span id="bs">0</span><br>Keys: A/D steer · W gas · S brake · Shift nitro · C camera · H horn · P pause</p></div>
-<div id="over" class="hide"><h1 id="ot">WRECKED</h1><p id="os" style="font-size:18px;line-height:1.7"></p><p class="s" id="coach"></p><button id="sn">📸 SAVE SNAPSHOT</button><button class="big" id="rt">DRIVE AGAIN</button><button id="mn">MENU</button><a href="./" style="color:#6ff;font-size:13px">← Garage home</a></div>
+<div id="over" class="hide"><h1 id="ot">WRECKED</h1><p id="os" style="font-size:18px;line-height:1.7"></p><p class="s" id="coach"></p><button id="sn">📸 SAVE SNAPSHOT</button><button id="sc2">🧠 AI SCENE SCAN</button><button class="big" id="rt">DRIVE AGAIN</button><button id="mn">MENU</button><a href="./" style="color:#6ff;font-size:13px">← Garage home</a></div>
 <script>
 (function(){
 var CJ='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',JD='https://cdn.jsdelivr.net/npm/three@0.128.0/',UP='https://unpkg.com/three@0.128.0/';
@@ -62,7 +62,7 @@ ld(['vendor/three.min.js',CJ,JD+'build/three.min.js',UP+'build/three.min.js'],fu
 "use strict";
 const $=i=>document.getElementById(i);addEventListener('error',e=>{const b=$('err');b.style.display='block';b.textContent='Error: '+e.message+' (line '+e.lineno+')'});const cv=$('c'),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),rnd=(a,b)=>a+Math.random()*(b-a);
 const MODES={highway:{tr:1,fd:1,night:0,cf:1},night:{tr:1.5,fd:1,night:1,cf:1.2},fuel:{tr:1,fd:2.2,night:0,cf:.8}};
-let comp=null,aber=null,bloom=null,MUTE=false,snap=0,live=false,WX={rain:0,fog:0,night:0,txt:''},carName='',mode='highway',hq=true,tilt=0,cam=0,paused=false,running=false,best=0;
+let comp=null,aber=null,bloom=null,MUTE=false,snap=0,DIR=1,fpsA=0,fpsN=0,live=false,WX={rain:0,fog:0,night:0,txt:''},carName='',mode='highway',hq=true,tilt=0,cam=0,paused=false,running=false,best=0;
 try{best=+localStorage.getItem('nd_best')||0}catch(e){}
 $('bs').textContent=best;
 /* ---------- renderer ---------- */
@@ -160,13 +160,13 @@ function update(dt){const m=MODES[mode];let v=s.v;
   s.nitro=clamp(s.nitro+(nit?-34*(1-.1*UP.nit):3)*dt,0,100);flame.visible=nit;if(nit)flame.scale.setScalar(rnd(2.5,3.6));
   s.fuel-=dt*(.25+v*.01)*m.fd*(1-.08*UP.tnk)*(gas?1:.35);
   s.x=clamp(s.x+s.steer*Math.min(1,v/8)*(4.5+v*.1)*(live&&WX.rain?.8:1)*(1+.06*UP.tyr)*dt,-7,7);s.yaw+=(-s.steer*.22-s.yaw)*Math.min(1,dt*8);
-  s.dist+=v*dt;s.score+=v*dt*.08*(s.x<0?2:1);
+  s.dist+=v*dt;s.score+=v*dt*.08*(s.x<0?2:1);if(s.dist>2000&&s.dmg===0)unlock('clean','Clean Driver: 2 km with no damage');
   s.comboT-=dt;if(s.comboT<=0)s.combo=0;
-  tCar-=dt;if(tCar<=0){spawnCar();tCar=rnd(.5,1.3)/m.tr}tCoin-=dt;if(tCoin<=0){spawnCoins();tCoin=rnd(5,9)/m.cf}tCan-=dt;if(tCan<=0){spawnCan();tCan=rnd(10,18)*(mode==='fuel'?1.7:1)}
+  tCar-=dt;if(tCar<=0){spawnCar();tCar=rnd(.5,1.3)/(m.tr*DIR)}tCoin-=dt;if(tCoin<=0){spawnCoins();tCoin=rnd(5,9)/m.cf}tCan-=dt;if(tCan<=0){spawnCan();tCan=rnd(10,18)*(mode==='fuel'?1.7:1)}
   for(const c of cars){const rel=c.dir>0?v-c.sp:v+c.sp;c.m.position.z+=rel*dt;const p=c.m.position;
    if(Math.abs(p.z)<(c.L+4)/2+.2&&Math.abs(p.x-s.x)<1.9&&!c.dead){hit(c,rel);break}
-   if(!c.passed&&p.z>3){c.passed=true;if(Math.abs(p.x-s.x)<3.4){s.combo++;s.comboT=4;const b=50*s.combo;s.score+=b;toast(`NEAR MISS +${b}${s.combo>1?'  x'+s.combo:''}`);tone(660,.15,'sine',.12,990)}}}
-  for(const c of coins){c.m.position.z+=v*dt;c.m.rotation.y+=dt*4;const p=c.m.position;if(!c.dead&&Math.abs(p.z)<2&&Math.abs(p.x-s.x)<1.7){c.dead=true;s.coins++;s.score+=25;tone(1200,.12,'sine',.1,1800);sc.remove(c.m)}}
+   if(!c.passed&&p.z>3){c.passed=true;if(Math.abs(p.x-s.x)<3.4){s.combo++;s.comboT=4;if(s.combo>=5)unlock('combo','Combo King: 5 near-misses chained');const b=50*s.combo;s.score+=b;toast(`NEAR MISS +${b}${s.combo>1?'  x'+s.combo:''}`);tone(660,.15,'sine',.12,990)}}}
+  for(const c of coins){c.m.position.z+=v*dt;c.m.rotation.y+=dt*4;const p=c.m.position;if(!c.dead&&Math.abs(p.z)<2&&Math.abs(p.x-s.x)<1.7){c.dead=true;s.coins++;s.score+=25;if(s.coins===30)unlock('coins','Coin Hoarder: 30 coins in one run');tone(1200,.12,'sine',.1,1800);sc.remove(c.m)}}
   for(const c of cans){c.m.position.z+=v*dt;c.m.rotation.y+=dt*2;const p=c.m.position;if(!c.dead&&Math.abs(p.z)<2&&Math.abs(p.x-s.x)<1.7){c.dead=true;s.fuel=Math.min(100,s.fuel+30);toast('FUEL +30');tone(500,.3,'triangle',.15,900);sc.remove(c.m)}}
   cars=cars.filter(c=>{const k=!c.dead&&c.m.position.z<30&&c.m.position.z>-300;if(!k&&!c.dead)sc.remove(c.m);return k});
   coins=coins.filter(c=>{const k=!c.dead&&c.m.position.z<20;if(!k&&!c.dead)sc.remove(c.m);return k});
@@ -214,11 +214,11 @@ $('pz').onclick=pause;
 $('modes').onclick=e=>{const m=e.target.dataset.m;if(!m)return;mode=m;[...$('modes').children].forEach(b=>b.classList.toggle('sel',b===e.target));applyMode()};
 $('qb').onclick=e=>{hq=!hq;e.target.textContent='GRAPHICS: '+(hq?'HIGH':'LOW');bloom&&(bloom.enabled=hq);rs()};
 $('tb').onclick=async e=>{if(!tilt){try{if(window.DeviceOrientationEvent&&DeviceOrientationEvent.requestPermission&&await DeviceOrientationEvent.requestPermission()!=='granted')return}catch(x){}tilt=1}else tilt=0;e.target.textContent='TILT: '+(tilt?'ON':'OFF')};
-function start(){document.body.classList.remove('inmenu');(async()=>{try{const d=document.documentElement;await(d.requestFullscreen||d.webkitRequestFullscreen).call(d);await screen.orientation.lock('landscape')}catch(e){}})();aud();if(AC&&AC.state==='suspended')AC.resume();reset();wAng=0;applyMode();running=true;paused=false;$('menu').classList.add('hide');$('over').classList.add('hide');$('ctl').classList.remove('hide');$('pz').classList.remove('hide');toast('GO!');pickCar().then(()=>toast(carName));tone(440,.2,'sine',.15,880)}
+function start(){document.body.classList.remove('inmenu');(async()=>{try{const d=document.documentElement;await(d.requestFullscreen||d.webkitRequestFullscreen).call(d);await screen.orientation.lock('landscape')}catch(e){}})();aud();if(AC&&AC.state==='suspended')AC.resume();reset();wAng=0;applyMode();running=true;paused=false;$('menu').classList.add('hide');$('over').classList.add('hide');$('ctl').classList.remove('hide');$('pz').classList.remove('hide');toast(DIR!==1?'GO! AI Director: traffic x'+DIR:'GO!');pickCar().then(()=>toast(carName));tone(440,.2,'sine',.15,880)}
 $('go').onclick=start;$('rt').onclick=start;$('mn').onclick=()=>{document.body.classList.add('inmenu');reset();$('over').classList.add('hide');$('menu').classList.remove('hide')};
 async function coach(sc){const e=$('coach');e.textContent='AI coach analysing your run…';const tl={score:sc,dist:Math.round(s.dist),coins:s.coins,damage:Math.round(s.dmg),fuel:Math.round(s.fuel),mode};
- try{const c=new AbortController();setTimeout(()=>c.abort(),5000);const r=await fetch('/api/agent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'coach my run',telemetry:tl}),signal:c.signal});if(!r.ok)throw 0;e.textContent=(await r.json()).answer}
- catch(x){e.textContent=tl.damage>60?'Offline coach: heavy damage — brake earlier and stay in your lane.':tl.fuel<25?'Offline coach: fuel was tight — grab green cans and ease off the gas.':'Offline coach: nice run — chain near-misses for combos.'}}
+ try{const c=new AbortController();setTimeout(()=>c.abort(),5000);const r=await fetch('/api/agent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'coach my run',telemetry:tl}),signal:c.signal});if(!r.ok)throw 0;const j=await r.json();e.textContent=j.answer;if(j.director){DIR=j.director.traffic;try{localStorage.setItem('g_dir',DIR)}catch(z){}}}
+ catch(x){DIR=tl.damage>=60?.75:(tl.damage<20&&tl.score>1500?1.25:1);e.textContent=tl.damage>60?'Offline coach: heavy damage — brake earlier and stay in your lane.':tl.fuel<25?'Offline coach: fuel was tight — grab green cans and ease off the gas.':'Offline coach: nice run — chain near-misses for combos.'}}
 /* ---- live data: free, key-less APIs (Open-Meteo, ipwho.is, NHTSA vPIC) ---- */
 const jf=(u,ms=5000)=>{const c=new AbortController();setTimeout(()=>c.abort(),ms);return fetch(u,{signal:c.signal}).then(r=>{if(!r.ok)throw 0;return r.json()})};
 async function goLive(){try{const g=await jf('https://ipwho.is/');if(!g.success)throw 0;const c=(await jf(`https://api.open-meteo.com/v1/forecast?latitude=${g.latitude}&longitude=${g.longitude}&current=temperature_2m,is_day,precipitation,weather_code`)).current,k=c.weather_code;
@@ -237,8 +237,17 @@ $('gp').onclick=e=>{const b=e.target.closest('button');if(!b||b.disabled)return;
 $('gb').onclick=()=>{renderG();$('gp').classList.toggle('hide')};renderG();
 $('mt').onclick=e=>{MUTE=!MUTE;e.target.textContent='SOUND: '+(MUTE?'OFF':'ON');if(egn&&MUTE)egn.gain.value=0};$('sn').onclick=()=>{snap=1};
 function pollGP(){const p=navigator.getGamepads?[...navigator.getGamepads()].find(x=>x):null;if(!p){GP.on=0;GP.g=GP.b=GP.n=0;return}const a=p.axes[0]||0,B=i=>p.buttons[i]&&p.buttons[i].value>.3?1:0;GP.ax=a;GP.on=Math.abs(a)>.1?1:0;GP.g=B(7)||B(0);GP.b=B(6)||B(1);GP.n=B(2)||B(5)}
+/* ---- AI director, CNN scan, achievements, saved settings ---- */
+try{DIR=+localStorage.getItem('g_dir')||1}catch(e){}
+$('sc2').onclick=()=>{snap=2};
+async function scan(b){const e=$('coach');e.textContent='CNN scanning frame…';try{const fd=new FormData();fd.append('file',new File([b],'frame.png',{type:'image/png'}));const r=await fetch('/api/cnn',{method:'POST',body:fd});if(!r.ok)throw 0;const j=await r.json();e.textContent=`CNN-style scan: ${j.label} · edge density ${j.edge_density} · brightness ${j.brightness}`}catch(x){e.textContent='Scene scan needs the Render backend.'}}
+const ACH={};try{Object.assign(ACH,JSON.parse(localStorage.getItem('g_ach')||'{}'))}catch(e){}
+function unlock(id,t){if(ACH[id])return;ACH[id]=1;try{localStorage.setItem('g_ach',JSON.stringify(ACH))}catch(e){}W$+=100;save();renderG();toast('🏆 '+t+' (+100🪙)');tone(1000,.25,'triangle',.15,1500)}
+function saveSet(){try{localStorage.setItem('g_set',JSON.stringify({mode,hq,mk:$('mk').value,cl:$('cl').value,mute:MUTE}))}catch(e){}}
+try{const S0=JSON.parse(localStorage.getItem('g_set')||'null');if(S0){if(MODES[S0.mode]){mode=S0.mode;[...$('modes').children].forEach(b=>b.classList.toggle('sel',b.dataset.m===mode))}hq=S0.hq!==false;$('qb').textContent='GRAPHICS: '+(hq?'HIGH':'LOW');bloom&&(bloom.enabled=hq);if(S0.mk)$('mk').value=S0.mk;if(S0.cl)$('cl').value=S0.cl;MUTE=!!S0.mute;$('mt').textContent='SOUND: '+(MUTE?'OFF':'ON');applyMode();rs()}}catch(e){}
+$('menu').addEventListener('click',saveSet);$('menu').addEventListener('change',saveSet);
 /* ---------- loop ---------- */
 let last=performance.now();
-(function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,(t-last)/1000);last=t;if(!paused)update(dt);if(comp){try{comp.render(dt)}catch(e){comp=null;R.render(sc,cm)}}else R.render(sc,cm);if(snap){snap=0;cv.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='garage.png';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)})}})(last);
+(function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,(t-last)/1000);last=t;if(!paused)update(dt);if(running&&!paused){fpsA+=dt;fpsN++;if(fpsN>=90){const f=fpsN/fpsA;fpsA=fpsN=0;if(f<38&&hq){hq=false;$('qb').textContent='GRAPHICS: LOW';bloom&&(bloom.enabled=false);rs();toast('Auto graphics: LOW for smooth play')}}}if(comp){try{comp.render(dt)}catch(e){comp=null;R.render(sc,cm)}}else R.render(sc,cm);if(snap){const md=snap;snap=0;cv.toBlob(b=>{if(md===2){scan(b);return}const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='garage.png';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)})}})(last);
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script></body></html>

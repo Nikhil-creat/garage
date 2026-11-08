@@ -76,7 +76,7 @@ footer{border-top:1px solid var(--line);padding:34px var(--gutter);display:flex;
 
 <section class="sec" id="features"><h2>Built like a product</h2><p class="sub">A real-time 3D driving game wrapped in an AI backend: agent, retrieval, vision and a hardened container.</p>
  <div class="grid">
-  <div class="card"><h3>Agentic AI coach</h3><p>A planner picks tools (RAG search, run analyser, vision scan), runs them and returns the answer with a visible step trace.</p></div>
+  <div class="card"><h3>Agentic AI coach</h3><p>A planner picks tools (RAG search, run analyser, vision scan), runs them and returns the answer with a visible step trace. An AI Director then tunes traffic for your next run.</p></div>
   <div class="card"><h3>Hybrid RAG</h3><p>TF-IDF retrieval over a driving-rules knowledge base, with cited sources in every answer.</p></div>
   <div class="card"><h3>CNN-style vision</h3><p>Upload a road photo: Sobel convolutions, ReLU and pooling estimate scene complexity. Heuristic kernels, not a trained model.</p></div>
   <div class="card"><h3>Garage progression</h3><p>Earn coins, then upgrade engine, tyres, nitro cell and fuel tank. Bloom, chromatic aberration, gamepad support and snapshot capture included.</p></div>
@@ -91,6 +91,7 @@ footer{border-top:1px solid var(--line);padding:34px var(--gutter);display:flex;
 <section class="sec" id="live"><h2>Live from the real world</h2><p class="sub">Garage reads real weather and a real leaderboard. Everything here uses free APIs.</p>
  <div class="grid"><div class="card"><h3>Conditions near you</h3><p id="lw">Loading…</p></div>
  <div class="card"><h3>Leaderboard</h3><ol id="lbd" style="padding-left:18px;color:var(--muted);font-size:14px;line-height:1.7"><li>Loading…</li></ol></div>
+ <div class="card"><h3>Backend status</h3><p id="st">Checking…</p></div>
  <div class="card"><h3>Free APIs used</h3><ul><li>Open-Meteo: weather, no key</li><li>ipwho.is: city lookup, no key</li><li>NHTSA vPIC: real car models, no key</li><li>Groq: optional LLM coach, free key kept server-side</li></ul></div></div></section>
 <section class="sec" id="credentials"><h2>Built by Nikhil Chary Sriramoju</h2><p class="sub">Final-year B.Tech CSE student shipping AI products end to end: games, agents, RAG, vision and deployment.</p>
  <div class="me">
@@ -110,6 +111,7 @@ $('copy-btn').onclick=async e=>{try{await navigator.clipboard.writeText(cmd.text
 const jf=(u,ms=5000)=>{const c=new AbortController();setTimeout(()=>c.abort(),ms);return fetch(u,{signal:c.signal}).then(r=>{if(!r.ok)throw 0;return r.json()})};
 (async()=>{try{const g=await jf('https://ipwho.is/'),c=(await jf(`https://api.open-meteo.com/v1/forecast?latitude=${g.latitude}&longitude=${g.longitude}&current=temperature_2m,is_day,precipitation`)).current;$('lw').textContent=`${g.city}: ${Math.round(c.temperature_2m)}°C, ${c.precipitation>0?'raining':'dry'}, ${c.is_day?'daytime':'night'}. Enable Live Weather in the game to drive in it.`}catch(e){$('lw').textContent='Weather unavailable right now.'}
  try{const r=await jf('/api/scores'),o=$('lbd');o.textContent='';if(!r.length)o.innerHTML='<li>No scores yet. Be first.</li>';r.forEach(x=>{const li=document.createElement('li');li.textContent=`${x.name} — ${x.score}`;o.appendChild(li)})}catch(e){$('lbd').innerHTML='<li>Leaderboard needs the Docker backend (Render).</li>'}})();
+(async()=>{try{const m=await jf('/api/metrics');$('st').textContent=`Online · uptime ${Math.round(m.uptime_s/60)} min · coach calls ${m.agent_calls||0} · scores ${m.scores_posted||0}`}catch(e){$('st').textContent='Offline (static host). Use the Render link for the full backend.'}})();
 /* ---- AI coach ---- */
 const FB={combo:'Pass traffic within about 3 m without touching it. Each chained near-miss within 4 s multiplies the bonus.',nitro:'Hold NITRO (Shift) to lift top speed to 62 m/s. It drains fast and recharges slowly, so use it on clear straights.',fuel:'Fuel Saver drains fuel 2.2x faster. Coast off the gas and collect green cans.',default:'Stay in the right-hand lanes, brake before gaps close, and use near-misses for combos.'};
 async function ask(q){const out=$('ans'),tr=$('trace');out.textContent='Thinking…';tr.textContent='';

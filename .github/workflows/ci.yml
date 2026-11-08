@@ -19,6 +19,9 @@ jobs:
           c = TestClient(app)
           assert c.get('/api/health').json()['ok']
           assert 'nitro' in c.post('/api/agent', json={'message': 'how does nitro work'}).json()['answer'].lower()
+          r = c.post('/api/agent', json={'message': 'coach my run', 'telemetry': {'score': 100, 'dist': 500, 'coins': 1, 'damage': 80, 'fuel': 50, 'mode': 'highway'}}).json()
+          assert r['director']['traffic'] < 1
+          assert c.get('/api/metrics').json()['agent_calls'] >= 2
           assert c.post('/api/scores', json={'name': 'x', 'score': 10**6, 'dist': 1, 'coins': 0}).status_code == 422
           print('backend ok')
           PY

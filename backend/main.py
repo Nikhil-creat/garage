@@ -1,5 +1,5 @@
 """Garage API: security middleware, hybrid-lite RAG (TF-IDF), tool-using agent, CNN-style vision scan."""
-import io, json, math, os, re, threading, time, urllib.request
+import io, json, math, os, re, threading, time, urllib.request, uuid
 from collections import Counter, defaultdict, deque
 from pathlib import Path
 import numpy as np
@@ -16,6 +16,7 @@ SEC = {
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
 }
 HITS: dict = defaultdict(deque)
+METRICS, START = Counter(), time.time()
 LIMIT, WINDOW, MAX_BODY = 60, 60, 2 * 1024 * 1024
 
 @app.middleware("http")
@@ -25,9 +26,10 @@ async def guard(req: Request, call_next):
         q, now = HITS[ip], time.time()
         while q and now - q[0] > WINDOW: q.popleft()
         if len(q) >= LIMIT: return JSONResponse({"detail": "rate limit"}, 429, headers=SEC)
-        q.append(now)
+        q.append(now); METRICS["api_requests"] += 1
         if int(req.headers.get("content-length") or 0) > MAX_BODY + 4096: return JSONResponse({"detail": "too large"}, 413, headers=SEC)
     res = await call_next(req)
+    res.headers["X-Request-ID"] = uuid.uuid4().hex[:12]
     for k, v in SEC.items(): res.headers[k] = v
     return res
 
@@ -40,6 +42,15 @@ KB = [
     ("lanes", "The road has four lanes. The two left lanes carry oncoming traffic and score double points but are dangerous. The two right lanes move in your direction at lower speeds."),
     ("night", "Night Rush adds headlights, 1.5 times the traffic and 1.2 times coin value. Watch taillight glows to judge distance."),
     ("scoring", "Score comes from distance, doubled in the oncoming lanes, plus 25 per coin and near-miss bonuses. Your best score is saved on this device."),
+]
+KB += [
+    ("upgrades", "Earn coins during runs; the wallet is saved on your device. In the Garage menu upgrade engine for 3 metres per second more top speed, tyres for 6 percent more grip, nitro cell for 10 percent less drain and fuel tank for 8 percent less burn, up to level 5 each. Each level costs 150 coins times the next level number."),
+    ("weather", "Live Weather uses real conditions for your city. Rain gives 20 percent less steering grip and 25 percent weaker brakes with wet reflective roads. Fog shortens visibility. Night appears when it is dark where you are."),
+    ("gamepad", "Gamepads work: left stick steers, right trigger or A accelerates, left trigger or B brakes, X or right bumper fires nitro."),
+    ("director", "The AI Director adjusts traffic density after each run based on damage and score so the game stays challenging but fair. Heavy damage lowers traffic, clean high-scoring runs raise it."),
+    ("leaderboard", "Enter a name in the menu before driving. Your score is posted when the run ends and the top ten appear on the landing page. Scores are sanity checked on the server."),
+    ("achievements", "Achievements: Combo King for five chained near misses, Clean Driver for two kilometres without damage, Coin Hoarder for thirty coins in one run. Each pays a 100 coin bonus."),
+    ("scan", "AI Scene Scan sends a frame of the game to the CNN-style vision endpoint, which reports clear road, busy scene or low visibility using edge density and brightness."),
 ]
 STOP = set("a an and are as at be by do does for from how i in is it of on or the to what when with you your my me can tips".split())
 TOK = lambda t: [w for w in re.findall(r"[a-z0-9]+", t.lower()) if w not in STOP]
@@ -54,6 +65,13 @@ def rag_search(q: str, k: int = 2):
         nrm = math.sqrt(sum((v * IDF[w]) ** 2 for w, v in c.items())) * math.sqrt(sum((v * IDF.get(w, 0)) ** 2 for w, v in qv.items())) or 1
         out.append((dot / nrm, name, KB[i][1]))
     return [o for o in sorted(out, reverse=True)[:k] if o[0] > 0.05]
+
+def director(t: dict) -> float:
+    x = 1.0
+    if t["damage"] >= 60: x -= 0.25
+    elif t["damage"] < 20 and t["score"] > 1500: x += 0.25
+    if t["fuel"] < 15: x -= 0.1
+    return round(min(1.5, max(0.6, x)), 2)
 
 def analyse_run(t: dict):
     tips = []
@@ -88,6 +106,7 @@ def top(): return sorted(_load(), key=lambda r: -r["score"])[:10]
 
 @app.post("/api/scores")
 def add(s: Score):
+    METRICS["scores_posted"] += 1
     if s.score > s.dist * 0.16 + s.coins * 25 + 60000: raise HTTPException(422, "implausible score")
     with LOCK:
         rows = sorted(_load() + [s.model_dump()], key=lambda r: -r["score"])[:200]
@@ -105,8 +124,12 @@ class Msg(BaseModel):
 @app.get("/api/health")
 def health(): return {"ok": True}
 
+@app.get("/api/metrics")
+def metrics(): return {**METRICS, "uptime_s": int(time.time() - START)}
+
 @app.post("/api/agent")
 def agent(m: Msg):
+    METRICS["agent_calls"] += 1
     trace = [f"plan: intent={'coach' if m.telemetry else 'question'}"]; parts = []
     if m.telemetry:
         trace.append("tool: analyse_run(telemetry)"); parts += analyse_run(m.telemetry.model_dump())
@@ -117,10 +140,13 @@ def agent(m: Msg):
     txt = " ".join(parts); out = llm(m.message, txt)
     if out: txt = out; trace.append("llm: groq")
     trace.append("compose: answer")
-    return {"answer": txt, "trace": trace}
+    dr = {"traffic": director(m.telemetry.model_dump())} if m.telemetry else None
+    if dr: trace.append(f"director: traffic x{dr['traffic']}")
+    return {"answer": txt, "trace": trace, "director": dr}
 
 @app.post("/api/cnn")
 async def cnn(file: UploadFile = File(...)):
+    METRICS["cnn_calls"] += 1
     if file.content_type not in ("image/jpeg", "image/png", "image/webp"): raise HTTPException(415, "jpeg/png/webp only")
     raw = await file.read(MAX_BODY + 1)
     if len(raw) > MAX_BODY: raise HTTPException(413, "max 2 MB")
