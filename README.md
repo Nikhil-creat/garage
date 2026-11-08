@@ -10,3 +10,13 @@
 Run once in the Supabase SQL editor:
 `create table scores(id bigint generated always as identity primary key, name text, score int, dist int, coins int, created_at timestamptz default now()); alter table scores enable row level security;`
 Then set `SUPABASE_URL` and `SUPABASE_KEY` (service_role key) in Render. Keep the key server-side only.
+
+## Architecture
+```mermaid
+flowchart LR
+  P[Browser / PWA / Android app] -->|HTTPS| R[FastAPI + static site on Render]
+  R --> RAG[TF-IDF RAG] & CNN[Sobel CNN scan] & LLM[Groq, optional] & DB[(Supabase, optional)]
+  P --> W[Open-Meteo, ipwho.is, NHTSA vPIC]
+```
+## Android APK
+GitHub, Actions, android-apk, Run workflow. Download the `garage-apk` artifact and install it. The app calls the Render backend.

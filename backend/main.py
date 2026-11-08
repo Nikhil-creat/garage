@@ -5,10 +5,12 @@ from pathlib import Path
 import numpy as np
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 app = FastAPI(title="Garage API", docs_url=None, redoc_url=None, openapi_url=None)
+app.add_middleware(CORSMiddleware, allow_origins=["https://localhost", "capacitor://localhost", "http://localhost"], allow_methods=["GET", "POST"], allow_headers=["Content-Type"])
 SEC = {
     "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://ipwho.is https://api.open-meteo.com https://vpic.nhtsa.dot.gov; frame-ancestors 'self'; base-uri 'self'; form-action 'self'",
     "X-Content-Type-Options": "nosniff", "X-Frame-Options": "SAMEORIGIN",
@@ -52,6 +54,7 @@ KB += [
     ("achievements", "Achievements: Combo King for five chained near misses, Clean Driver for two kilometres without damage, Coin Hoarder for thirty coins in one run. Each pays a 100 coin bonus."),
     ("scan", "AI Scene Scan sends a frame of the game to the CNN-style vision endpoint, which reports clear road, busy scene or low visibility using edge density and brightness."),
     ("time", "Time Attack gives 60 seconds on the clock. Every coin adds 2 seconds up to 99. When time runs out the run ends and your score is posted like any other mode."),
+    ("parking", "Parking mode: a green bay glows ahead in your right-hand lanes. Slow below about 12 kilometres per hour inside it and hold for just over one second to park. Each parking scores 300 plus 50 per success so far. Missing three bays ends the run. Top speed is limited to 24 metres per second."),
 ]
 STOP = set("a an and are as at be by do does for from how i in is it of on or the to what when with you your my me can tips".split())
 TOK = lambda t: [w for w in re.findall(r"[a-z0-9]+", t.lower()) if w not in STOP]
@@ -130,7 +133,7 @@ def add(s: Score):
 
 class Telemetry(BaseModel):
     score: int = Field(ge=0, le=10**9); dist: int = Field(ge=0, le=10**8); coins: int = Field(ge=0, le=10**5)
-    damage: int = Field(ge=0, le=200); fuel: int = Field(ge=-5, le=100); mode: str = Field(pattern="^(highway|night|fuel|time)$")
+    damage: int = Field(ge=0, le=200); fuel: int = Field(ge=-5, le=100); mode: str = Field(pattern="^(highway|night|fuel|time|park)$")
 
 class Msg(BaseModel):
     message: str = Field(min_length=1, max_length=500)
