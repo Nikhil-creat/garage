@@ -53,9 +53,9 @@ var CJ='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',JD='h
 var FX=['examples/js/shaders/CopyShader.js','examples/js/shaders/LuminosityHighPassShader.js','examples/js/postprocessing/EffectComposer.js','examples/js/postprocessing/RenderPass.js','examples/js/postprocessing/ShaderPass.js','examples/js/postprocessing/UnrealBloomPass.js'];
 function ld(u,cb){var i=0;(function n(){if(i>=u.length){cb(false);return}var s=document.createElement('script');s.src=u[i++];s.onload=function(){cb(true)};s.onerror=function(){s.remove();n()};document.head.appendChild(s)})()}
 function run(){var s=document.createElement('script');s.textContent=document.getElementById('game').textContent;document.body.appendChild(s)}
-ld([CJ,JD+'build/three.min.js',UP+'build/three.min.js'],function(ok){
+ld(['vendor/three.min.js',CJ,JD+'build/three.min.js',UP+'build/three.min.js'],function(ok){
  if(!ok){var b=document.getElementById('err');b.style.display='block';b.textContent='Could not download three.js from any CDN. Turn off ad-blocker/private DNS or data saver, then reload.';return}
- var k=0;(function nx(){if(k>=FX.length){run();return}ld([JD+FX[k],UP+FX[k]],function(){k++;nx()})})()})
+ var k=0;(function nx(){if(k>=FX.length){run();return}ld(['vendor/'+FX[k].split('/').pop(),JD+FX[k],UP+FX[k]],function(){k++;nx()})})()})
 })();
 </script>
 <script type="text/plain" id="game">
