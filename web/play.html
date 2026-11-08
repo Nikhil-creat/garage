@@ -47,14 +47,18 @@ body.inmenu .hud,body.inmenu #vig{visibility:hidden}
 <div class="row"><button id="qb">GRAPHICS: HIGH</button><button id="tb">TILT: OFF</button></div>
 <div class="row"><select id="mk" aria-label="Car make"><option>Toyota</option><option>Honda</option><option>Ford</option><option>BMW</option><option>Tesla</option><option>Hyundai</option></select><input type="color" id="cl" value="#00e5ff" aria-label="Car colour"><input id="nm" maxlength="16" placeholder="Leaderboard name" aria-label="Name"></div><div class="row"><button id="lb">LIVE WEATHER: OFF</button></div><p class="s" id="lv"></p><div class="row"><button id="gb">🔧 GARAGE · <span id="wl">0</span>🪙</button><button id="mt">SOUND: ON</button></div><div id="gp" class="row hide"></div><button class="big" id="go">START ENGINE</button><p class="s">Best: <span id="bs">0</span><br>Keys: A/D steer · W gas · S brake · Shift nitro · C camera · H horn · P pause</p></div>
 <div id="over" class="hide"><h1 id="ot">WRECKED</h1><p id="os" style="font-size:18px;line-height:1.7"></p><p class="s" id="coach"></p><button id="sn">📸 SAVE SNAPSHOT</button><button class="big" id="rt">DRIVE AGAIN</button><button id="mn">MENU</button><a href="./" style="color:#6ff;font-size:13px">← Garage home</a></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 <script>
+(function(){
+var CJ='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',JD='https://cdn.jsdelivr.net/npm/three@0.128.0/',UP='https://unpkg.com/three@0.128.0/';
+var FX=['examples/js/shaders/CopyShader.js','examples/js/shaders/LuminosityHighPassShader.js','examples/js/postprocessing/EffectComposer.js','examples/js/postprocessing/RenderPass.js','examples/js/postprocessing/ShaderPass.js','examples/js/postprocessing/UnrealBloomPass.js'];
+function ld(u,cb){var i=0;(function n(){if(i>=u.length){cb(false);return}var s=document.createElement('script');s.src=u[i++];s.onload=function(){cb(true)};s.onerror=function(){s.remove();n()};document.head.appendChild(s)})()}
+function run(){var s=document.createElement('script');s.textContent=document.getElementById('game').textContent;document.body.appendChild(s)}
+ld([CJ,JD+'build/three.min.js',UP+'build/three.min.js'],function(ok){
+ if(!ok){var b=document.getElementById('err');b.style.display='block';b.textContent='Could not download three.js from any CDN. Turn off ad-blocker/private DNS or data saver, then reload.';return}
+ var k=0;(function nx(){if(k>=FX.length){run();return}ld([JD+FX[k],UP+FX[k]],function(){k++;nx()})})()})
+})();
+</script>
+<script type="text/plain" id="game">
 "use strict";
 const $=i=>document.getElementById(i);addEventListener('error',e=>{const b=$('err');b.style.display='block';b.textContent='Error: '+e.message+' (line '+e.lineno+')'});const cv=$('c'),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),rnd=(a,b)=>a+Math.random()*(b-a);
 const MODES={highway:{tr:1,fd:1,night:0,cf:1},night:{tr:1.5,fd:1,night:1,cf:1.2},fuel:{tr:1,fd:2.2,night:0,cf:.8}};
