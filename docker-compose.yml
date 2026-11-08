@@ -8,5 +8,7 @@ services:
     tmpfs: ["/tmp"]
     environment:
       GROQ_API_KEY: ${GROQ_API_KEY:-}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_KEY: ${SUPABASE_KEY:-}
     mem_limit: 512m
     restart: unless-stopped

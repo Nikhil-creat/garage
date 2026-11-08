@@ -36,17 +36,17 @@ p.s{font-size:12px;opacity:.7;max-width:340px;margin:4px}
 body.inmenu .hud,body.inmenu #vig{visibility:hidden}
 </style></head><body class="inmenu"><div id="err" style="position:fixed;bottom:0;left:0;right:0;z-index:99;background:#a00;color:#fff;font:12px monospace;padding:6px;display:none"></div>
 <canvas id="c"></canvas><div id="vig"></div><div id="hit"></div>
-<div class="hud" id="top"><div>SCORE<b id="sc">0</b></div><div style="text-align:center">DIST<b id="ds">0.0</b></div><div style="text-align:right;margin-right:60px">COINS<b id="cn">0</b></div></div>
+<div class="hud" id="top"><div>SCORE<b id="sc">0</b></div><div style="text-align:center"><span id="dl">DIST</span><b id="ds">0.0</b></div><div style="text-align:right;margin-right:60px">COINS<b id="cn">0</b></div></div>
 <div class="hud" id="spd"><b id="kmh">0</b><small>KM/H · GEAR <span id="gr">1</span></small>
 <div id="bars"><div><small>FUEL</small><div class="bar"><i id="fu"></i></div></div><div><small>DAMAGE</small><div class="bar"><i id="dm" style="background:#f45;width:0"></i></div></div><div><small>NITRO</small><div class="bar"><i id="nt" style="background:#fa0"></i></div></div></div></div>
 <div class="hud" id="toast"></div>
 <button id="pz" class="hide">❚❚</button>
 <div id="ctl" class="hide"><div id="wheel"></div><div id="pr"><div class="col"><div class="pd" id="nit">NITRO</div><div class="pd" id="brk">BRAKE</div></div><div class="pd" id="gas">GAS</div></div></div>
 <div id="menu"><h1>GARAGE</h1><p class="s">Ultra-advanced 3D driving sim · dodge two-way traffic, collect coins &amp; fuel, chain near-misses.</p>
-<div class="row" id="modes"><button data-m="highway" class="sel">HIGHWAY</button><button data-m="night">NIGHT RUSH</button><button data-m="fuel">FUEL SAVER</button></div>
+<div class="row" id="modes"><button data-m="highway" class="sel">HIGHWAY</button><button data-m="night">NIGHT RUSH</button><button data-m="fuel">FUEL SAVER</button><button data-m="time">TIME ATTACK</button></div>
 <div class="row"><button id="qb">GRAPHICS: HIGH</button><button id="tb">TILT: OFF</button></div>
-<div class="row"><select id="mk" aria-label="Car make"><option>Toyota</option><option>Honda</option><option>Ford</option><option>BMW</option><option>Tesla</option><option>Hyundai</option></select><input type="color" id="cl" value="#00e5ff" aria-label="Car colour"><input id="nm" maxlength="16" placeholder="Leaderboard name" aria-label="Name"></div><div class="row"><button id="lb">LIVE WEATHER: OFF</button></div><p class="s" id="lv"></p><div class="row"><button id="gb">🔧 GARAGE · <span id="wl">0</span>🪙</button><button id="mt">SOUND: ON</button></div><div id="gp" class="row hide"></div><button class="big" id="go">START ENGINE</button><p class="s">Best: <span id="bs">0</span><br>Keys: A/D steer · W gas · S brake · Shift nitro · C camera · H horn · P pause</p></div>
-<div id="over" class="hide"><h1 id="ot">WRECKED</h1><p id="os" style="font-size:18px;line-height:1.7"></p><p class="s" id="coach"></p><button id="sn">📸 SAVE SNAPSHOT</button><button id="sc2">🧠 AI SCENE SCAN</button><button class="big" id="rt">DRIVE AGAIN</button><button id="mn">MENU</button><a href="./" style="color:#6ff;font-size:13px">← Garage home</a></div>
+<div class="row"><select id="mk" aria-label="Car make"><option>Toyota</option><option>Honda</option><option>Ford</option><option>BMW</option><option>Tesla</option><option>Hyundai</option></select><input type="color" id="cl" value="#00e5ff" aria-label="Car colour"><input id="nm" maxlength="16" placeholder="Leaderboard name" aria-label="Name"></div><div class="row"><button id="lb">LIVE WEATHER: OFF</button></div><p class="s" id="lv"></p><div class="row"><button id="gb">🔧 GARAGE · <span id="wl">0</span>🪙</button><button id="mt">SOUND: ON</button><button id="ins" class="hide">⬇ INSTALL APP</button></div><div id="gp" class="row hide"></div><button class="big" id="go">START ENGINE</button><p class="s">Best: <span id="bs">0</span><br>Keys: A/D steer · W gas · S brake · Shift nitro · C camera · H horn · P pause</p></div>
+<div id="over" class="hide"><h1 id="ot">WRECKED</h1><p id="os" style="font-size:18px;line-height:1.7"></p><p class="s" id="coach"></p><button id="sn">📸 SAVE SNAPSHOT</button><button id="sc2">🧠 AI SCENE SCAN</button><button id="shr">📤 SHARE</button><button class="big" id="rt">DRIVE AGAIN</button><button id="mn">MENU</button><a href="./" style="color:#6ff;font-size:13px">← Garage home</a></div>
 <script>
 (function(){
 var CJ='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',JD='https://cdn.jsdelivr.net/npm/three@0.128.0/',UP='https://unpkg.com/three@0.128.0/';
@@ -61,7 +61,7 @@ ld(['vendor/three.min.js',CJ,JD+'build/three.min.js',UP+'build/three.min.js'],fu
 <script type="text/plain" id="game">
 "use strict";
 const $=i=>document.getElementById(i);addEventListener('error',e=>{const b=$('err');b.style.display='block';b.textContent='Error: '+e.message+' (line '+e.lineno+')'});const cv=$('c'),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),rnd=(a,b)=>a+Math.random()*(b-a);
-const MODES={highway:{tr:1,fd:1,night:0,cf:1},night:{tr:1.5,fd:1,night:1,cf:1.2},fuel:{tr:1,fd:2.2,night:0,cf:.8}};
+const MODES={highway:{tr:1,fd:1,night:0,cf:1},night:{tr:1.5,fd:1,night:1,cf:1.2},fuel:{tr:1,fd:2.2,night:0,cf:.8},time:{tr:1.2,fd:.5,night:0,cf:1.5,limit:60}};
 let comp=null,aber=null,bloom=null,MUTE=false,snap=0,DIR=1,fpsA=0,fpsN=0,live=false,WX={rain:0,fog:0,night:0,txt:''},carName='',mode='highway',hq=true,tilt=0,cam=0,paused=false,running=false,best=0;
 try{best=+localStorage.getItem('nd_best')||0}catch(e){}
 $('bs').textContent=best;
@@ -137,7 +137,7 @@ const vib=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
 /* ---------- state ---------- */
 const LN=[-6,-2,2,6];let s,cars=[],coins=[],cans=[],tCar=0,tCoin=0,tCan=5,toastT=0,shake=0;
 function reset(){cars.concat(coins,cans).forEach(o=>sc.remove(o.m));cars=[];coins=[];cans=[];
- s={v:0,x:2,yaw:0,steer:0,fuel:100,dmg:0,nitro:100,score:0,dist:0,coins:0,combo:0,comboT:0,t:0,gas:0,brk:0,nit:0,key:{l:0,r:0}}}
+ s={v:0,x:2,yaw:0,steer:0,fuel:100,dmg:0,nitro:100,score:0,dist:0,coins:0,combo:0,comboT:0,t:0,left:60,gas:0,brk:0,nit:0,key:{l:0,r:0}}}
 reset();
 function applyMode(){const m=MODES[mode],n=live?WX.night:m.night,fg=live&&(WX.fog||WX.rain),bg=new THREE.Color(n?0x0c1030:fg?0x6b7480:0xbfe3ff);sc.background=bg;sky.material.uniforms.bot.value.copy(bg);sky.material.uniforms.top.value.set(n?0x02030a:fg?0x4a525e:0x2a6fd6);sc.fog=new THREE.Fog(bg,fg?12:n?40:90,fg?(WX.fog?80:170):n?190:330);rd.material.roughness=live&&WX.rain?.12:.35;rd.material.metalness=live&&WX.rain?.8:.4;
  hemi.intensity=n?.3:1.3;sun.intensity=n?.12:1.1;stars.visible=!!n;sunS.visible=!n;spot.intensity=n?2.5:0;bMats.forEach(b=>b.emissiveIntensity=n?1.1:.12);lamps.forEach(l=>l.children[2].visible=true)}
@@ -153,7 +153,7 @@ function over(why){running=false;s.v=0;tone(120,.8,'sawtooth',.2,30);vib([200,80
 function hit(c,rel){s.dmg+=clamp(rel*.9+6,8,45);s.v*=.35;s.combo=0;shake=1;burst(c.m.position.x,.8,c.m.position.z,50);$('hit').style.opacity=1;setTimeout(()=>$('hit').style.opacity=0,120);tone(90,.4,'sawtooth',.25,30);vib(120);toast('CRASH!');s.x+=(s.x<c.m.position.x?-1:1)*1.2;sc.remove(c.m);c.dead=true}
 /* ---------- update ---------- */
 function update(dt){const m=MODES[mode];let v=s.v;
- if(running){s.t+=dt;
+ if(running){s.t+=dt;if(m.limit){s.left-=dt;if(s.left<=0){s.left=0;over('TIME UP');return}}
   let st=s.steer;if(tilt)st=tiltV;else st=clamp(st+(s.key.r-s.key.l)*0,-1,1);
   pollGP();const k=s.key.r-s.key.l;if(GP.on)wAng=clamp(GP.ax*100,-100,100);else if(k)wAng=clamp(wAng+k*dt*3.5*100,-100,100);else if(!wDrag)wAng*=.88;
   s.steer=clamp((tilt?tiltV*100:wAng)/70,-1,1);
@@ -169,7 +169,7 @@ function update(dt){const m=MODES[mode];let v=s.v;
   for(const c of cars){const rel=c.dir>0?v-c.sp:v+c.sp;c.m.position.z+=rel*dt;const p=c.m.position;
    if(Math.abs(p.z)<(c.L+4)/2+.2&&Math.abs(p.x-s.x)<1.9&&!c.dead){hit(c,rel);break}
    if(!c.passed&&p.z>3){c.passed=true;if(Math.abs(p.x-s.x)<3.4){s.combo++;s.comboT=4;if(s.combo>=5)unlock('combo','Combo King: 5 near-misses chained');const b=50*s.combo;s.score+=b;toast(`NEAR MISS +${b}${s.combo>1?'  x'+s.combo:''}`);tone(660,.15,'sine',.12,990)}}}
-  for(const c of coins){c.m.position.z+=v*dt;c.m.rotation.y+=dt*4;const p=c.m.position;if(!c.dead&&Math.abs(p.z)<2&&Math.abs(p.x-s.x)<1.7){c.dead=true;s.coins++;s.score+=25;if(s.coins===30)unlock('coins','Coin Hoarder: 30 coins in one run');tone(1200,.12,'sine',.1,1800);sc.remove(c.m)}}
+  for(const c of coins){c.m.position.z+=v*dt;c.m.rotation.y+=dt*4;const p=c.m.position;if(!c.dead&&Math.abs(p.z)<2&&Math.abs(p.x-s.x)<1.7){c.dead=true;s.coins++;s.score+=25;if(m.limit)s.left=Math.min(99,s.left+2);if(s.coins===30)unlock('coins','Coin Hoarder: 30 coins in one run');tone(1200,.12,'sine',.1,1800);sc.remove(c.m)}}
   for(const c of cans){c.m.position.z+=v*dt;c.m.rotation.y+=dt*2;const p=c.m.position;if(!c.dead&&Math.abs(p.z)<2&&Math.abs(p.x-s.x)<1.7){c.dead=true;s.fuel=Math.min(100,s.fuel+30);toast('FUEL +30');tone(500,.3,'triangle',.15,900);sc.remove(c.m)}}
   cars=cars.filter(c=>{const k=!c.dead&&c.m.position.z<30&&c.m.position.z>-300;if(!k&&!c.dead)sc.remove(c.m);return k});
   coins=coins.filter(c=>{const k=!c.dead&&c.m.position.z<20;if(!k&&!c.dead)sc.remove(c.m);return k});
@@ -198,7 +198,7 @@ function update(dt){const m=MODES[mode];let v=s.v;
  stars.position.copy(cm.position);sky.position.copy(cm.position);sunS.position.x=cm.position.x+60;
  $('vig').style.transform=`scale(${1+v/260})`;
  /* hud */
- $('kmh').textContent=Math.round(v*3.6);$('gr').textContent=1+Math.min(5,Math.floor(v/9));$('sc').textContent=Math.floor(s.score);$('ds').textContent=(s.dist/1000).toFixed(2);$('cn').textContent=s.coins;
+ $('kmh').textContent=Math.round(v*3.6);$('gr').textContent=1+Math.min(5,Math.floor(v/9));$('sc').textContent=Math.floor(s.score);$('dl').textContent=m.limit?'TIME':'DIST';$('ds').textContent=m.limit?Math.ceil(s.left)+'s':(s.dist/1000).toFixed(2);$('cn').textContent=s.coins;
  $('fu').style.width=clamp(s.fuel,0,100)+'%';$('fu').style.background=s.fuel<20?'#f45':'';$('dm').style.width=clamp(s.dmg,0,100)+'%';$('nt').style.width=s.nitro+'%';
  if(toastT>0){toastT-=dt;if(toastT<=0)$('toast').style.opacity=0}}
 /* ---------- input ---------- */
@@ -221,7 +221,7 @@ $('tb').onclick=async e=>{if(!tilt){try{if(window.DeviceOrientationEvent&&Device
 function start(){document.body.classList.remove('inmenu');(async()=>{try{const d=document.documentElement;await(d.requestFullscreen||d.webkitRequestFullscreen).call(d);await screen.orientation.lock('landscape')}catch(e){}})();aud();if(AC&&AC.state==='suspended')AC.resume();reset();wAng=0;applyMode();running=true;paused=false;$('menu').classList.add('hide');$('over').classList.add('hide');$('ctl').classList.remove('hide');$('pz').classList.remove('hide');toast(DIR!==1?'GO! AI Director: traffic x'+DIR:'GO!');pickCar().then(()=>toast(carName));tone(440,.2,'sine',.15,880)}
 $('go').onclick=start;$('rt').onclick=start;$('mn').onclick=()=>{document.body.classList.add('inmenu');reset();$('over').classList.add('hide');$('menu').classList.remove('hide')};
 async function coach(sc){const e=$('coach');e.textContent='AI coach analysing your run…';const tl={score:sc,dist:Math.round(s.dist),coins:s.coins,damage:Math.round(s.dmg),fuel:Math.round(s.fuel),mode};
- try{const c=new AbortController();setTimeout(()=>c.abort(),5000);const r=await fetch('/api/agent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'coach my run',telemetry:tl}),signal:c.signal});if(!r.ok)throw 0;const j=await r.json();e.textContent=j.answer;if(j.director){DIR=j.director.traffic;try{localStorage.setItem('g_dir',DIR)}catch(z){}}}
+ try{const c=new AbortController();setTimeout(()=>c.abort(),5000);const r=await fetch('/api/agent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'coach my run',telemetry:tl}),signal:c.signal});if(!r.ok)throw 0;const j=await r.json();e.textContent=j.answer;say(j.answer);if(j.director){DIR=j.director.traffic;try{localStorage.setItem('g_dir',DIR)}catch(z){}}}
  catch(x){DIR=tl.damage>=60?.75:(tl.damage<20&&tl.score>1500?1.25:1);e.textContent=tl.damage>60?'Offline coach: heavy damage — brake earlier and stay in your lane.':tl.fuel<25?'Offline coach: fuel was tight — grab green cans and ease off the gas.':'Offline coach: nice run — chain near-misses for combos.'}}
 /* ---- live data: free, key-less APIs (Open-Meteo, ipwho.is, NHTSA vPIC) ---- */
 const jf=(u,ms=5000)=>{const c=new AbortController();setTimeout(()=>c.abort(),ms);return fetch(u,{signal:c.signal}).then(r=>{if(!r.ok)throw 0;return r.json()})};
@@ -250,6 +250,10 @@ function unlock(id,t){if(ACH[id])return;ACH[id]=1;try{localStorage.setItem('g_ac
 function saveSet(){try{localStorage.setItem('g_set',JSON.stringify({mode,hq,mk:$('mk').value,cl:$('cl').value,mute:MUTE}))}catch(e){}}
 try{const S0=JSON.parse(localStorage.getItem('g_set')||'null');if(S0){if(MODES[S0.mode]){mode=S0.mode;[...$('modes').children].forEach(b=>b.classList.toggle('sel',b.dataset.m===mode))}hq=S0.hq!==false;$('qb').textContent='GRAPHICS: '+(hq?'HIGH':'LOW');bloom&&(bloom.enabled=hq);if(S0.mk)$('mk').value=S0.mk;if(S0.cl)$('cl').value=S0.cl;MUTE=!!S0.mute;$('mt').textContent='SOUND: '+(MUTE?'OFF':'ON');applyMode();rs()}}catch(e){}
 $('menu').addEventListener('click',saveSet);$('menu').addEventListener('change',saveSet);
+function say(t){try{if(MUTE||!window.speechSynthesis)return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.rate=1.05;speechSynthesis.speak(u)}catch(e){}}
+$('shr').onclick=async()=>{const t=`I scored ${Math.floor(s.score)} in Garage! Can you beat it?`,u=location.origin;try{if(navigator.share)await navigator.share({title:'Garage',text:t,url:u});else{await navigator.clipboard.writeText(t+' '+u);toast('Copied to clipboard')}}catch(e){}};
+let ipr=null;addEventListener('beforeinstallprompt',e=>{e.preventDefault();ipr=e;$('ins').classList.remove('hide')});
+$('ins').onclick=async()=>{if(!ipr)return;ipr.prompt();await ipr.userChoice;ipr=null;$('ins').classList.add('hide')};
 /* ---------- loop ---------- */
 let last=performance.now();
 (function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,(t-last)/1000);last=t;if(!paused)update(dt);if(running&&!paused){fpsA+=dt;fpsN++;if(fpsN>=90){const f=fpsN/fpsA;fpsA=fpsN=0;if(f<38&&hq){hq=false;$('qb').textContent='GRAPHICS: LOW';bloom&&(bloom.enabled=false);rs();toast('Auto graphics: LOW for smooth play')}}}if(comp){try{comp.render(dt)}catch(e){comp=null;R.render(sc,cm)}}else R.render(sc,cm);if(snap){const md=snap;snap=0;cv.toBlob(b=>{if(md===2){scan(b);return}const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='garage.png';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)})}})(last);

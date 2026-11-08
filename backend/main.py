@@ -51,6 +51,7 @@ KB += [
     ("leaderboard", "Enter a name in the menu before driving. Your score is posted when the run ends and the top ten appear on the landing page. Scores are sanity checked on the server."),
     ("achievements", "Achievements: Combo King for five chained near misses, Clean Driver for two kilometres without damage, Coin Hoarder for thirty coins in one run. Each pays a 100 coin bonus."),
     ("scan", "AI Scene Scan sends a frame of the game to the CNN-style vision endpoint, which reports clear road, busy scene or low visibility using edge density and brightness."),
+    ("time", "Time Attack gives 60 seconds on the clock. Every coin adds 2 seconds up to 99. When time runs out the run ends and your score is posted like any other mode."),
 ]
 STOP = set("a an and are as at be by do does for from how i in is it of on or the to what when with you your my me can tips".split())
 TOK = lambda t: [w for w in re.findall(r"[a-z0-9]+", t.lower()) if w not in STOP]
@@ -96,18 +97,32 @@ class Score(BaseModel):
     name: str = Field(pattern=r"^[A-Za-z0-9 _.\-]{1,16}$"); score: int = Field(ge=0, le=10**7)
     dist: int = Field(ge=0, le=10**7); coins: int = Field(ge=0, le=10**4)
 
+SB_URL, SB_KEY = os.environ.get("SUPABASE_URL", "").rstrip("/"), os.environ.get("SUPABASE_KEY", "")
+def _sb(method, path, body=None):
+    req = urllib.request.Request(f"{SB_URL}/rest/v1/{path}", json.dumps(body).encode() if body is not None else None,
+        {"apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY, "Content-Type": "application/json", "Prefer": "return=minimal", "User-Agent": "garage/1.0"}, method=method)
+    with urllib.request.urlopen(req, timeout=6) as r: return json.loads(r.read() or "null")
+
 DB, LOCK = Path("/tmp/garage_scores.json"), threading.Lock()
 def _load():
     try: return json.loads(DB.read_text())
     except Exception: return []
 
 @app.get("/api/scores")
-def top(): return sorted(_load(), key=lambda r: -r["score"])[:10]
+def top():
+    if SB_URL and SB_KEY:
+        try: return _sb("GET", "scores?select=name,score&order=score.desc&limit=10")
+        except Exception: pass
+    return sorted(_load(), key=lambda r: -r["score"])[:10]
 
 @app.post("/api/scores")
 def add(s: Score):
     METRICS["scores_posted"] += 1
     if s.score > s.dist * 0.16 + s.coins * 25 + 60000: raise HTTPException(422, "implausible score")
+    if SB_URL and SB_KEY:
+        try:
+            _sb("POST", "scores", {"name": s.name, "score": s.score, "dist": s.dist, "coins": s.coins}); return {"ok": True}
+        except Exception: pass
     with LOCK:
         rows = sorted(_load() + [s.model_dump()], key=lambda r: -r["score"])[:200]
         DB.write_text(json.dumps(rows))
@@ -115,7 +130,7 @@ def add(s: Score):
 
 class Telemetry(BaseModel):
     score: int = Field(ge=0, le=10**9); dist: int = Field(ge=0, le=10**8); coins: int = Field(ge=0, le=10**5)
-    damage: int = Field(ge=0, le=200); fuel: int = Field(ge=-5, le=100); mode: str = Field(pattern="^(highway|night|fuel)$")
+    damage: int = Field(ge=0, le=200); fuel: int = Field(ge=-5, le=100); mode: str = Field(pattern="^(highway|night|fuel|time)$")
 
 class Msg(BaseModel):
     message: str = Field(min_length=1, max_length=500)
